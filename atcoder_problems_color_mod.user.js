@@ -4,6 +4,7 @@
 // @version      2020.01.15.2
 // @description  AtCoder Problems のユーザページ上で色の塗り方を細分化します
 // @author       iilj
+// @supportURL   https://github.com/iilj/AtCoderProblemsColorMod/issues
 // @match        https://kenkoooo.com/atcoder/*
 // @grant        GM_addStyle
 // ==/UserScript==
