@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         AtCoder Problems Color Mod
 // @namespace    iilj
-// @version      2020.01.15.2
+// @version      2020.01.15.3
 // @description  AtCoder Problems のユーザページ上で色の塗り方を細分化します
 // @author       iilj
 // @supportURL   https://github.com/iilj/AtCoderProblemsColorMod/issues
@@ -202,8 +202,11 @@ div.apcm-timespan {
                 const contestProblemList = contestProblemListsMap[contestId];
                 if (contestProblemList.every(problemId => {
                     const key = getProblemUrl(contestId, problemId);
-                    const userResult = userResultsMap[key];
-                    return (userResult.epoch_second <= contest.start_epoch_second + contest.duration_second);
+                    if (key in userResultsMap) {
+                        const userResult = userResultsMap[key];
+                        return (userResult.epoch_second <= contest.start_epoch_second + contest.duration_second);
+                    }
+                    return false;
                 })) {
                     td.classList.add('apcm-intime');
                     if (contestProblemList.every(problemId => {
