@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         AtCoder Problems Color Mod
 // @namespace    iilj
-// @version      2020.01.15.1
+// @version      2020.01.15.2
 // @description  AtCoder Problems のユーザページ上で色の塗り方を細分化します
 // @author       iilj
 // @match        https://kenkoooo.com/atcoder/*
@@ -15,6 +15,9 @@
 td.apcm-intime {
     background-color: #9AD59E;
     position: relative;
+}
+td.apcm-intime-writer {
+    background-color: #9CF;
 }
 td.apcm-intime-nonac {
     background-color: #F5CD98;
@@ -38,6 +41,9 @@ div.apcm-timespan {
 .react-bs-table .table-striped tbody tr.apcm-intime td {
     background-color: #9AD59E;
     border-color: #DDD;
+}
+.react-bs-table .table-striped tbody tr.apcm-intime-writer td {
+    background-color: #9CF;
 }
 .react-bs-table .table-striped tbody tr.apcm-intime-nonac td {
     background-color: #F5CD98;
@@ -181,6 +187,9 @@ div.apcm-timespan {
                 const contest = contestsMap[userResult.contest_id];
                 if (userResult.epoch_second <= contest.start_epoch_second + contest.duration_second) {
                     td.classList.add(td.classList.contains('table-success') ? 'apcm-intime' : 'apcm-intime-nonac');
+                    if (userResult.epoch_second < contest.start_epoch_second) {
+                        td.classList.add('apcm-intime-writer');
+                    }
                     const divTimespan = document.createElement("div");
                     divTimespan.innerText = formatTimespan(userResult.epoch_second - contest.start_epoch_second);
                     divTimespan.classList.add('apcm-timespan');
@@ -196,6 +205,13 @@ div.apcm-timespan {
                     return (userResult.epoch_second <= contest.start_epoch_second + contest.duration_second);
                 })) {
                     td.classList.add('apcm-intime');
+                    if (contestProblemList.every(problemId => {
+                        const key = getProblemUrl(contestId, problemId);
+                        const userResult = userResultsMap[key];
+                        return (userResult.epoch_second < contest.start_epoch_second);
+                    })) {
+                        td.classList.add('apcm-intime-writer');
+                    }
                 }
             }
         });
@@ -228,6 +244,9 @@ div.apcm-timespan {
                     const contest = contestsMap[userResult.contest_id];
                     if (userResult.epoch_second <= contest.start_epoch_second + contest.duration_second) {
                         tr.classList.add(tr.classList.contains('table-success') ? 'apcm-intime' : 'apcm-intime-nonac');
+                        if (userResult.epoch_second < contest.start_epoch_second) {
+                            tr.classList.add('apcm-intime-writer');
+                        }
                     }
                 }
             });
