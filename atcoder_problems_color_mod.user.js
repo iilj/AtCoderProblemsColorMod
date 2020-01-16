@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         AtCoder Problems Color Mod
 // @namespace    iilj
-// @version      2020.01.15.3
+// @version      2020.01.16.1
 // @description  AtCoder Problems のユーザページ上で色の塗り方を細分化します
 // @author       iilj
 // @supportURL   https://github.com/iilj/AtCoderProblemsColorMod/issues
@@ -74,7 +74,7 @@ div.apcm-timespan {
      *
      * @date 2020-01-15
      * @param {string} uri 取得するリソースのURI
-     * @returns {Object[]} 配列
+     * @returns {Promise<Object[]>} 配列
      */
     async function getJson(uri) {
         const response = await fetch(uri);
@@ -87,7 +87,7 @@ div.apcm-timespan {
      * get contestId->contest map and contestUrl->contestId map
      *
      * @date 2020-01-15
-     * @returns {Object[]} array [contestId->contest map, contestUrl->contestId map]
+     * @returns {Promise<Object[]>} array [contestId->contest map, contestUrl->contestId map]
      */
     async function getContestsMap() {
         const contests = await getJson('https://kenkoooo.com/atcoder/resources/contests.json');
@@ -107,7 +107,7 @@ div.apcm-timespan {
      *
      * @date 2020-01-15
      * @param {string} userId
-     * @returns {Object} problemUrl->submit map
+     * @returns {Promise<Object>} problemUrl->submit map
      */
     async function getUserResultsMap(userId) {
         const userResults = await getJson(`https://kenkoooo.com/atcoder/atcoder-api/results?user=${userId}`);
@@ -138,7 +138,7 @@ div.apcm-timespan {
      * return contestId->[problemId] map
      *
      * @date 2020-01-15
-     * @returns {Object} contestId->[problemId] map
+     * @returns {Promise<Object>} contestId->[problemId] map
      */
     async function getContestProblemListMap() {
         const contestProblem = await getJson('https://kenkoooo.com/atcoder/resources/contest-problem.json');
@@ -171,9 +171,16 @@ div.apcm-timespan {
     }
 
     /**
+     * Table 表示ページで "Show Accepted" の変更検知に利用する MutationObserver
+     * 
+     * @type {MutationObserver}
+     */
+    let tableObserver;
+
+    /**
      * Table 表示ページで表のセルの色を塗り分ける．
      *
-     * @date 2020-01-15
+     * @date 2020-01-16
      * @param {string} userId
      */
     async function processTable(userId) {
@@ -181,43 +188,59 @@ div.apcm-timespan {
         const userResultsMap = await getUserResultsMap(userId);
         const contestProblemListsMap = await getContestProblemListMap();
 
-        document.querySelectorAll('td.table-success, td.table-warning').forEach(td => {
-            const lnk = td.querySelector('a[href]');
-            if (lnk.href in userResultsMap) {
-                const userResult = userResultsMap[lnk.href];
-                const contest = contestsMap[userResult.contest_id];
-                if (userResult.epoch_second <= contest.start_epoch_second + contest.duration_second) {
-                    td.classList.add(td.classList.contains('table-success') ? 'apcm-intime' : 'apcm-intime-nonac');
-                    if (userResult.epoch_second < contest.start_epoch_second) {
-                        td.classList.add('apcm-intime-writer');
+        const tableChanged = () => {
+            if (tableObserver) {
+                tableObserver.disconnect();
+            }
+            document.querySelectorAll('td.table-success, td.table-warning').forEach(td => {
+                const lnk = td.querySelector('a[href]');
+                if (lnk.href in userResultsMap) {
+                    const userResult = userResultsMap[lnk.href];
+                    const contest = contestsMap[userResult.contest_id];
+                    if (userResult.epoch_second <= contest.start_epoch_second + contest.duration_second) {
+                        td.classList.add(td.classList.contains('table-success') ? 'apcm-intime' : 'apcm-intime-nonac');
+                        if (userResult.epoch_second < contest.start_epoch_second) {
+                            td.classList.add('apcm-intime-writer');
+                        }
+                        const divTimespan = document.createElement("div");
+                        divTimespan.innerText = formatTimespan(userResult.epoch_second - contest.start_epoch_second);
+                        divTimespan.classList.add('apcm-timespan');
+                        td.insertAdjacentElement('beforeend', divTimespan);
                     }
-                    const divTimespan = document.createElement("div");
-                    divTimespan.innerText = formatTimespan(userResult.epoch_second - contest.start_epoch_second);
-                    divTimespan.classList.add('apcm-timespan');
-                    td.insertAdjacentElement('beforeend', divTimespan);
-                }
-            } else if (lnk.href in contestsUrl2Id) {
-                const contestId = contestsUrl2Id[lnk.href];
-                const contest = contestsMap[contestId];
-                const contestProblemList = contestProblemListsMap[contestId];
-                if (contestProblemList.every(problemId => {
-                    const key = getProblemUrl(contestId, problemId);
-                    if (key in userResultsMap) {
-                        const userResult = userResultsMap[key];
-                        return (userResult.epoch_second <= contest.start_epoch_second + contest.duration_second);
-                    }
-                    return false;
-                })) {
-                    td.classList.add('apcm-intime');
+                } else if (lnk.href in contestsUrl2Id) {
+                    const contestId = contestsUrl2Id[lnk.href];
+                    const contest = contestsMap[contestId];
+                    const contestProblemList = contestProblemListsMap[contestId];
                     if (contestProblemList.every(problemId => {
                         const key = getProblemUrl(contestId, problemId);
-                        const userResult = userResultsMap[key];
-                        return (userResult.epoch_second < contest.start_epoch_second);
+                        if (key in userResultsMap) {
+                            const userResult = userResultsMap[key];
+                            return (userResult.epoch_second <= contest.start_epoch_second + contest.duration_second);
+                        }
+                        return false;
                     })) {
-                        td.classList.add('apcm-intime-writer');
+                        td.classList.add('apcm-intime');
+                        if (contestProblemList.every(problemId => {
+                            const key = getProblemUrl(contestId, problemId);
+                            const userResult = userResultsMap[key];
+                            return (userResult.epoch_second < contest.start_epoch_second);
+                        })) {
+                            td.classList.add('apcm-intime-writer');
+                        }
                     }
                 }
+            });
+            if (tableObserver) {
+                document.querySelectorAll('.react-bs-container-body').forEach(div => {
+                    tableObserver.observe(div, { childList: true, subtree: true });
+                });
             }
+        };
+
+        tableObserver = new MutationObserver(mutations => tableChanged());
+        tableChanged();
+        document.querySelectorAll('.react-bs-container-body').forEach(div => {
+            tableObserver.observe(div, { childList: true, subtree: true });
         });
     }
 
@@ -266,9 +289,13 @@ div.apcm-timespan {
      * @date 2020-01-15
      */
     const hrefChanged = () => {
+        if (tableObserver) {
+            tableObserver.disconnect();
+        }
         if (listObserver) {
             listObserver.disconnect();
         }
+
         /** @type {RegExpMatchArray} */
         let result;
         if (result = location.href.match(/^https?:\/\/kenkoooo\.com\/atcoder\/#\/table\/([^/?#]+)/)) {
